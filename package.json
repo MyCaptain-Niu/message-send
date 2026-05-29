@@ -1,0 +1,13 @@
+{
+  "name": "phone-to-pc-text",
+  "version": "1.0.0",
+  "description": "手机扫码传文本到电脑",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.14.2"
+  }
+}

@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>手机发送端 - 传文本到电脑</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif; }
+        body {
+            background: linear-gradient(145deg, #f0f4fa, #e2e8f2);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            max-width: 500px;
+            width: 100%;
+            border-radius: 48px;
+            padding: 30px 24px 40px;
+            box-shadow: 0 25px 45px -12px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+            color: #1e2f3f;
+        }
+        .sub {
+            color: #5a6f82;
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+        }
+        .rich-input {
+            width: 100%;
+            padding: 16px;
+            font-size: 1rem;
+            border-radius: 32px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            font-family: inherit;
+            transition: 0.2s;
+            min-height: 140px;
+            max-height: 280px;
+            overflow-y: auto;
+            text-align: left;
+            white-space: pre-wrap;
+        }
+        .rich-input:focus {
+            outline: none;
+            border-color: #2c7da0;
+            box-shadow: 0 0 0 3px rgba(44,125,160,0.2);
+        }
+        .rich-input:empty::before {
+            content: attr(data-placeholder);
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        .actions-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            align-items: center;
+        }
+        .file-select-btn {
+            background: #eef2f9;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            flex-shrink: 0;
+        }
+        .file-select-btn:active { background: #dde4ed; transform: scale(0.95); }
+        button.send-btn {
+            background: #1e3a4d;
+            color: white;
+            border: none;
+            flex: 1;
+            padding: 14px;
+            border-radius: 60px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        button.send-btn:active { transform: scale(0.97); background: #0f2b3a; }
+
+        .file-badge {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 6px 14px;
+            background: #e0f2fe;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: #0c4a6e;
+        }
+        .file-badge .remove-file {
+            margin-left: auto;
+            font-weight: bold;
+            color: #b91c1c;
+            cursor: pointer;
+        }
+
+        #status {
+            margin-top: 16px;
+            font-size: 0.85rem;
+            padding: 12px;
+            border-radius: 40px;
+            background: #f1f5f9;
+            color: #2c3e4e;
+            transition: 0.2s;
+        }
+        .success { background: #dcfce7; color: #15803d; }
+        .error { background: #fee2e2; color: #b91c1c; }
+        .info { background: #e0f2fe; color: #0c4a6e; }
+
+        /* 聊天消息区域 */
+        .receive-section {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            text-align: left;
+        }
+        .receive-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .receive-header h3 {
+            font-size: 0.95rem;
+            color: #1e2f3f;
+        }
+        .receive-header .clear-btn {
+            background: #edf2f7;
+            border: none;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .receive-list {
+            background: #f0f2f5;
+            border-radius: 20px;
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 12px 10px;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .receive-empty { text-align: center; color: #a0b3c9; padding: 30px 10px; font-size: 0.85rem; }
+
+        /* 聊天行 */
+        .chat-row {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+            animation: fadeIn 0.2s ease;
+        }
+        .chat-row.received { align-self: flex-start; align-items: flex-start; }
+        .chat-row.sent { align-self: flex-end; align-items: flex-end; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .chat-sender {
+            font-size: 0.6rem;
+            color: #8a9bb0;
+            margin-bottom: 2px;
+            padding: 0 8px;
+        }
+
+        .chat-bubble {
+            padding: 10px 14px;
+            border-radius: 18px;
+            word-break: break-word;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .chat-bubble p,
+        .chat-bubble ul,
+        .chat-bubble ol,
+        .chat-bubble blockquote,
+        .chat-bubble pre,
+        .chat-bubble h1,
+        .chat-bubble h2,
+        .chat-bubble h3,
+        .chat-bubble h4,
+        .chat-bubble h5,
+        .chat-bubble h6 { margin: 0.35em 0; }
+        .chat-bubble ul,
+        .chat-bubble ol { padding-left: 1.4em; }
+        .chat-bubble pre {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+        }
+        .chat-bubble a {
+            color: inherit;
+            text-decoration: underline;
+        }
+        .chat-row.received .chat-bubble {
+            background: white;
+            border-bottom-left-radius: 6px;
+            color: #1e2f3f;
+        }
+        .chat-row.sent .chat-bubble {
+            background: #1e3a4d;
+            border-bottom-right-radius: 6px;
+            color: white;
+        }
+
+        .chat-time {
+            font-size: 0.6rem;
+            margin-top: 3px;
+            padding: 0 4px;
+            opacity: 0.6;
+        }
+        .chat-row.received .chat-time { color: #6c7e91; text-align: left; }
+        .chat-row.sent .chat-time { color: rgba(255,255,255,0.7); text-align: right; }
+
+        .rcv-image {
+            max-width: 100%;
+            max-height: 180px;
+            border-radius: 10px;
+            display: block;
+            margin-bottom: 4px;
+        }
+        .chat-row.received .rcv-image { border: 1px solid #e2e8f0; }
+        .chat-row.sent .rcv-image { border: 1px solid rgba(255,255,255,0.2); }
+
+        .rcv-file {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 10px;
+            padding: 8px 12px;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        .chat-row.received .rcv-file { background: #f1f5f9; color: #1e2f3f; }
+        .chat-row.sent .rcv-file { background: rgba(255,255,255,0.15); color: white; }
+        .rcv-file-name {
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 500;
+        }
+        .rcv-file-size { font-size: 0.7rem; opacity: 0.7; }
+        .rcv-image-label {
+            font-size: 0.7rem;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        footer {
+            margin-top: 24px;
+            font-size: 0.7rem;
+            color: #8ba0b5;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 16px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📱 发送到电脑</h1>
+    <div class="sub">电脑端二维码扫描进入此页面 | 双向传输</div>
+    <div id="textInput" class="rich-input" contenteditable="true" data-placeholder="输入你想传输到电脑的文字，支持粘贴带格式内容..."></div>
+
+    <!-- 操作行 -->
+    <div class="actions-row">
+        <input type="file" id="fileInput" hidden accept="*/*" />
+        <button class="file-select-btn" id="fileSelectBtn" title="选择文件">📎</button>
+        <button class="send-btn" id="sendBtn">📤 发送到电脑</button>
+    </div>
+    <div class="file-badge" id="fileBadge">
+        📄 <span id="fileBadgeName"></span>
+        <span class="remove-file" id="removeFile">✕</span>
+    </div>
+
+    <div id="status">⚡ 就绪，点击发送</div>
+
+    <!-- 接收来自电脑的消息 -->
+    <div class="receive-section">
+        <div class="receive-header">
+            <h3>📬 来自电脑的消息</h3>
+            <button class="clear-btn" id="clearReceiveBtn">清空</button>
+        </div>
+        <div class="receive-list" id="receiveList">
+            <div class="receive-empty">✨ 等待电脑发送...</div>
+        </div>
+    </div>
+
+    <footer>请确保手机与电脑在同一 Wi-Fi 下 | 收到文本自动复制</footer>
+</div>
+
+<script>
+    const sendBtn = document.getElementById('sendBtn');
+    const textInput = document.getElementById('textInput');
+    const statusDiv = document.getElementById('status');
+    const fileInput = document.getElementById('fileInput');
+    const fileSelectBtn = document.getElementById('fileSelectBtn');
+    const fileBadge = document.getElementById('fileBadge');
+    const fileBadgeName = document.getElementById('fileBadgeName');
+    const removeFileBtn = document.getElementById('removeFile');
+    const receiveList = document.getElementById('receiveList');
+    const clearReceiveBtn = document.getElementById('clearReceiveBtn');
+
+    let socket = null;
+    let connecting = false;
+    let selectedFile = null;
+    let receivedMessages = [];
+    let maxFileSize = 100 * 1024 * 1024; // 默认 100MB，连接后由服务端更新
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[m] || m);
+    }
+
+    function escapeAttribute(str) {
+        return escapeHtml(str).replace(/"/g, '&quot;');
+    }
+
+    function normalizeEditorHtml(html) {
+        return (html || '')
+            .replace(/<div><br><\/div>/gi, '<br>')
+            .replace(/<div>/gi, '<p>')
+            .replace(/<\/div>/gi, '</p>')
+            .replace(/&nbsp;/gi, ' ')
+            .trim();
+    }
+
+    function sanitizeRichHtml(rawHtml) {
+        if (!rawHtml) return '';
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div>${normalizeEditorHtml(rawHtml)}</div>`, 'text/html');
+        const allowedTags = new Set(['A', 'B', 'BLOCKQUOTE', 'BR', 'CODE', 'EM', 'I', 'LI', 'OL', 'P', 'PRE', 'S', 'SPAN', 'STRONG', 'U', 'UL']);
+        const allowedStyleProps = new Set(['font-weight', 'font-style', 'text-decoration', 'color', 'background-color', 'text-align']);
+
+        const walk = (node) => {
+            if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.textContent || '');
+            if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+            const tag = node.tagName.toUpperCase();
+            const childrenHtml = Array.from(node.childNodes).map(walk).join('');
+            if (!allowedTags.has(tag)) return childrenHtml;
+
+            let attrs = '';
+            if (tag === 'A') {
+                const href = node.getAttribute('href') || '';
+                if (/^(https?:|mailto:|tel:)/i.test(href)) {
+                    attrs += ` href="${escapeAttribute(href)}" target="_blank" rel="noopener noreferrer"`;
+                }
+            }
+
+            const styleText = (node.getAttribute('style') || '')
+                .split(';')
+                .map(part => part.trim())
+                .filter(Boolean)
+                .map(part => {
+                    const idx = part.indexOf(':');
+                    if (idx === -1) return null;
+                    const prop = part.slice(0, idx).trim().toLowerCase();
+                    const value = part.slice(idx + 1).trim();
+                    if (!allowedStyleProps.has(prop) || !value || /url\s*\(/i.test(value)) return null;
+                    return `${prop}:${value}`;
+                })
+                .filter(Boolean)
+                .join(';');
+
+            if (styleText) attrs += ` style="${escapeAttribute(styleText)}"`;
+            return `<${tag.toLowerCase()}${attrs}>${childrenHtml}</${tag.toLowerCase()}>`;
+        };
+
+        return Array.from(doc.body.firstChild.childNodes).map(walk).join('').trim();
+    }
+
+    function htmlToPlainText(html) {
+        if (!html) return '';
+        const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+        return (doc.body.innerText || doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    function plainTextToHtml(text) {
+        return escapeHtml(text || '').replace(/\n/g, '<br>');
+    }
+
+    function getEditorPayload(editor) {
+        const html = sanitizeRichHtml(editor.innerHTML);
+        const content = htmlToPlainText(html);
+        return { content, html };
+    }
+
+    function setEditorContent(editor, html) {
+        editor.innerHTML = html || '';
+    }
+
+    async function writeToClipboard(content, html) {
+        try {
+            if (html && navigator.clipboard && window.ClipboardItem && navigator.clipboard.write) {
+                const item = new ClipboardItem({
+                    'text/plain': new Blob([content], { type: 'text/plain' }),
+                    'text/html': new Blob([html], { type: 'text/html' })
+                });
+                await navigator.clipboard.write([item]);
+                return true;
+            }
+            if (content && navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(content);
+                return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
+    function formatSize(bytes) {
+        if (!bytes) return '';
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function updateStatus(msg, type) {
+        statusDiv.innerHTML = msg;
+        statusDiv.className = type || 'info';
+    }
+
+    function renderReceived() {
+        if (receivedMessages.length === 0) {
+            receiveList.innerHTML = '<div class="receive-empty">✨ 等待电脑发送...</div>';
+            return;
+        }
+        receiveList.innerHTML = receivedMessages.map(msg => {
+            const side = msg.from === 'mobile' ? 'sent' : 'received';
+            const sender = msg.from === 'mobile' ? '手机' : '电脑';
+            const timeHtml = `<div class="chat-time">${msg.time}</div>`;
+
+            if (msg.type === 'text') {
+                return `<div class="chat-row ${side}">
+                    <div class="chat-sender">${sender}</div>
+                    <div class="chat-bubble">${msg.html || plainTextToHtml(msg.text)}</div>
+                    ${timeHtml}
+                </div>`;
+            }
+            if (msg.type === 'image') {
+                return `<div class="chat-row ${side}">
+                    <div class="chat-sender">${sender}</div>
+                    <div class="chat-bubble">
+                        <img class="rcv-image" src="${msg.content}" alt="${escapeHtml(msg.filename)}" />
+                        <div class="rcv-image-label">${escapeHtml(msg.filename)}</div>
+                    </div>
+                    ${timeHtml}
+                </div>`;
+            }
+            if (msg.type === 'file') {
+                return `<div class="chat-row ${side}">
+                    <div class="chat-sender">${sender}</div>
+                    <div class="chat-bubble">
+                        <a class="rcv-file" href="${msg.content}" download="${escapeHtml(msg.filename)}">
+                            <span>📄</span>
+                            <span class="rcv-file-name">${escapeHtml(msg.filename)}</span>
+                            <span class="rcv-file-size">${formatSize(msg.size)}</span>
+                            <span>⬇️</span>
+                        </a>
+                    </div>
+                    ${timeHtml}
+                </div>`;
+            }
+            return '';
+        }).join('');
+        receiveList.scrollTop = receiveList.scrollHeight;
+    }
+
+    let _lastMsgKey = '';
+    function addChatMessage(data, from) {
+        // 去重：相同来源+相同内容 1 秒内不重复添加
+        const msgKey = `${from || 'computer'}|${data.type}|${data.content || data.text || ''}`;
+        if (msgKey === _lastMsgKey) return;
+        _lastMsgKey = msgKey;
+        setTimeout(() => { if (_lastMsgKey === msgKey) _lastMsgKey = ''; }, 1000);
+
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+        const entry = { from: from || 'computer', time: timeStr };
+        if (data.type === 'text') {
+            entry.type = 'text'; entry.text = data.content; entry.html = data.html ? sanitizeRichHtml(data.html) : '';
+        } else if (data.type === 'image') {
+            entry.type = 'image'; entry.content = data.content; entry.filename = data.filename;
+        } else if (data.type === 'file') {
+            entry.type = 'file'; entry.content = data.content; entry.filename = data.filename; entry.mimeType = data.mimeType; entry.size = data.size;
+        }
+        receivedMessages.push(entry);
+        if (receivedMessages.length > 100) receivedMessages.shift();
+        renderReceived();
+    }
+
+    function connectWebSocket() {
+        if (socket && socket.readyState === WebSocket.OPEN) return Promise.resolve(socket);
+        if (connecting) return new Promise((resolve) => { setTimeout(() => resolve(connectWebSocket()), 200); });
+
+        connecting = true;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/mobile`;
+
+        return new Promise((resolve, reject) => {
+            try {
+                const ws = new WebSocket(wsUrl);
+                ws.onopen = () => {
+                    socket = ws;
+                    connecting = false;
+                    updateStatus('✅ 已连接服务器，可以发送', 'success');
+                    resolve(ws);
+                };
+                ws.onerror = () => {
+                    connecting = false;
+                    updateStatus('❌ 连接失败，请检查网络后刷新页面', 'error');
+                    reject(new Error('连接失败'));
+                };
+                ws.onclose = () => {
+                    socket = null;
+                    updateStatus('⚠️ 连接已断开，刷新页面重试', 'error');
+                };
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'ack') {
+                            updateStatus('✅ 发送成功', 'success');
+                            setEditorContent(textInput, '');
+                        } else if (data.type === 'system') {
+                            if (data.maxFileSizeMB) {
+                                maxFileSize = data.maxFileSizeMB * 1024 * 1024;
+                            }
+                            updateStatus(`ℹ️ ${data.content}`, 'info');
+                        } else if (data.type === 'info') {
+                            updateStatus(`ℹ️ ${data.content}`, 'info');
+                        } else if (data.type === 'text' && data.content) {
+                            addChatMessage(data, 'computer');
+                            writeToClipboard(data.content, data.html).then(() => {
+                                updateStatus('📋 已复制到剪贴板', 'success');
+                            }).catch(() => {});
+                        } else if (data.type === 'image' && data.content) {
+                            addChatMessage(data, 'computer');
+                            updateStatus('📷 收到图片', 'success');
+                        } else if (data.type === 'file' && data.content) {
+                            addChatMessage(data, 'computer');
+                            updateStatus('📄 收到文件', 'success');
+                        }
+                    } catch(e) {}
+                };
+            } catch(err) {
+                connecting = false;
+                updateStatus('无法建立连接', 'error');
+                reject(err);
+            }
+        });
+    }
+
+    // 文件选择
+    fileSelectBtn.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        if (file.size > maxFileSize) {
+            updateStatus(`⚠️ 文件过大（最大 ${Math.round(maxFileSize / 1024 / 1024)}MB）`, 'error');
+            fileInput.value = '';
+            return;
+        }
+        selectedFile = file;
+        fileBadgeName.textContent = file.name + ' (' + formatSize(file.size) + ')';
+        fileBadge.style.display = 'flex';
+    });
+
+    removeFileBtn.addEventListener('click', () => {
+        selectedFile = null;
+        fileInput.value = '';
+        fileBadge.style.display = 'none';
+    });
+
+    function readFileAsBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function sendToPc() {
+        const { content, html } = getEditorPayload(textInput);
+        if (!content && !selectedFile) {
+            updateStatus('📝 请输入文字或选择文件再发送', 'info');
+            return;
+        }
+
+        try {
+            let ws = socket;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                updateStatus('🔄 正在连接服务器...', 'info');
+                ws = await connectWebSocket();
+            }
+            if (ws.readyState !== WebSocket.OPEN) {
+                updateStatus('连接尚未就绪，请稍后重试', 'error');
+                return;
+            }
+
+            // 发送文本
+            if (content) {
+                ws.send(JSON.stringify({ type: 'text', content: content, html: html || undefined }));
+                addChatMessage({ type: 'text', content: content, html: html || undefined }, 'mobile');
+                setEditorContent(textInput, '');
+            }
+
+            // 发送文件
+            if (selectedFile) {
+                try {
+                    const dataUrl = await readFileAsBase64(selectedFile);
+                    const isImage = selectedFile.type.startsWith('image/');
+                    const msgType = isImage ? 'image' : 'file';
+                    ws.send(JSON.stringify({
+                        type: msgType,
+                        content: dataUrl,
+                        filename: selectedFile.name,
+                        mimeType: selectedFile.type,
+                        size: selectedFile.size
+                    }));
+                    addChatMessage({
+                        type: msgType,
+                        content: dataUrl,
+                        filename: selectedFile.name,
+                        mimeType: selectedFile.type,
+                        size: selectedFile.size
+                    }, 'mobile');
+                } catch (err) {
+                    updateStatus('⚠️ 读取文件失败', 'error');
+                }
+                selectedFile = null;
+                fileInput.value = '';
+                fileBadge.style.display = 'none';
+            }
+
+            updateStatus('⏳ 发送中...', 'info');
+        } catch (err) {
+            updateStatus('发送失败，请刷新页面重试', 'error');
+        }
+    }
+
+    sendBtn.addEventListener('click', sendToPc);
+    clearReceiveBtn.addEventListener('click', () => {
+        receivedMessages = [];
+        renderReceived();
+    });
+
+    connectWebSocket().catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+name: Build and Push to Private Registry
+
+on:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 登录到你的私有仓库 (使用 GitHub Secrets 中的凭证)
+      - name: Log in to private registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      # 3. 构建并推送镜像
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # tags 用于给镜像打标签，格式为: 仓库地址/项目名/镜像名:版本号
+          tags: |
+           ${{ secrets.REGISTRY_URL }}/message-send:${{ github.sha }}
+           ${{ secrets.REGISTRY_URL }}/message-send:latest

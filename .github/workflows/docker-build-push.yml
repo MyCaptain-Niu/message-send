@@ -18,6 +18,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
       # ... (docker/login-action, docker/build-push-action 等步骤)
+      - name: Log in to private registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
       - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:

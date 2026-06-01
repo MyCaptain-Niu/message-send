@@ -37,7 +37,7 @@ jobs:
           docker push ${{ env.REGISTRY_URL }}/message-send:latest
 
   deploy:
-    needs: build-and-push  # 等待build任务成功完成后再执行
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
       # 1. 配置 SSH
@@ -50,9 +50,18 @@ jobs:
       - name: Deploy to VPS
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -e
             cd /opt/message-send || exit 1
+
+            # 关键：登录私有仓库
+            echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login ${{ env.REGISTRY_URL }} -u "${{ secrets.REGISTRY_USER }}" --password-stdin
+
             export REGISTRY_URL=${{ env.REGISTRY_URL }}
             export COMMIT_SHA=${{ env.COMMIT_SHA }}
+
             docker compose pull
             docker compose up -d
+
+            # 可选：清理旧镜像
+            docker image prune -f
           EOF
